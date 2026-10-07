@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Anusha AI Assistant</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="assistant">
+
+        <!-- HEADER -->
+        <header class="header">
+
+            <div class="logo">
+                🤖
+            </div>
+
+            <div class="header-text">
+
+                <h1>Anusha AI</h1>
+
+                <p>
+                    Your personal AI assistant
+                </p>
+
+            </div>
+
+            <div class="online">
+
+                <span></span>
+
+                Online
+
+            </div>
+
+        </header>
+
+
+        <!-- CHAT AREA -->
+        <main id="chat" class="chat">
+
+            <div class="message bot">
+
+                <div class="avatar">
+                    🤖
+                </div>
+
+                <div class="bubble">
+
+                    <strong>
+                        Hi Anusha! 👋
+                    </strong>
+
+                    <br>
+                    <br>
+
+                    I'm your personal AI assistant.
+
+                    <br>
+                    <br>
+
+                    You can ask me about:
+
+                    <br>
+                    <br>
+
+                    💻 Web development
+
+                    <br>
+
+                    💼 Freelancing & jobs
+
+                    <br>
+
+                    📈 Trading
+
+                    <br>
+
+                    📚 Learning
+
+                    <br>
+
+                    ✍️ Writing
+
+                    <br>
+
+                    💡 Anything else
+
+                </div>
+
+            </div>
+
+        </main>
+
+
+        <!-- INPUT AREA -->
+        <div class="input-area">
+
+            <!-- CLEAR CHAT -->
+            <button
+                class="icon-button"
+                onclick="clearChat()"
+                title="Clear chat">
+                🗑️
+            </button>
+
+
+            <!-- VOICE INPUT -->
+            <button
+                class="icon-button"
+                onclick="startVoiceInput()"
+                title="Voice input">
+                🎤
+            </button>
+
+
+            <!-- TEXT INPUT -->
+            <input
+                type="text"
+                id="userInput"
+                placeholder="Ask me anything..."
+                autocomplete="off">
+
+
+            <!-- VOICE ON/OFF -->
+            <button
+                id="voiceToggleButton"
+                class="icon-button"
+                onclick="toggleVoice()"
+                title="Voice ON">
+                🔊
+            </button>
+
+
+            <!-- PAUSE / RESUME -->
+            <button
+                id="pauseVoiceButton"
+                class="icon-button"
+                onclick="togglePause()"
+                title="Pause">
+                ⏸️
+            </button>
+
+
+            <!-- SEND -->
+            <button
+                class="send-button"
+                onclick="sendMessage()"
+                title="Send">
+                ➤
+            </button>
+
+        </div>
+
+
+        <!-- FOOTER -->
+        <div class="footer">
+
+            <span>
+                ✨ AI powered assistant
+            </span>
+
+            <span>
+                •
+            </span>
+
+            <span>
+                Voice enabled
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <!-- JAVASCRIPT -->
+    <script src="script.js"></script>
+
+</body>
+
+</html>
