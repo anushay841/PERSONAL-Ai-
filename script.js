@@ -1,115 +1,105 @@
+
+"use strict";
+
+// ========================================
+// ANUSHA AI ASSISTANT
+// ========================================
+
 let conversationHistory = [];
 let recognition = null;
 
 let speechEnabled = true;
-let speechQueue = [];
-let currentSpeechIndex = 0;
 let isPaused = false;
 let isSpeaking = false;
 let voiceListening = false;
 
-const API_URL =
-    "https://script.google.com/macros/s/AKfycbxk7CT74ypSbNfE60IqilhGp6rIflvwYdRITcge-X-RFhNnB5BbnV1GIht52hpXkj1EQg/exec";
+let currentUtterance = null;
+let currentSpeechText = "";
+let speechCharIndex = 0;
+let speechWasMuted = false;
 
+let typingTimer = null;
+let requestInProgress = false;
+
+// Apps Script URL
+const API_URL = "https://script.google.com/macros/s/AKfycbxk7CT74ypSbNfE60IqilhGp6rIflvwYdRITcge-X-RFhNnB5BbnV1GIht52hpXkj1EQg/exec";
 
 // ========================================
-// COMMAND CHECKER
+// WEBSITE COMMANDS
 // ========================================
 
 function checkCommand(text) {
-
     const command = text.toLowerCase().trim();
 
-    // GOOGLE
-    if (
-        command.includes("open google") ||
-        command.includes("google kholo") ||
-        command.includes("google khol do") ||
-        command === "google"
-    ) {
-        window.open("https://www.google.com/", "_blank");
-        return "Google khol rahi hoon 🌐";
+    const sites = [
+        {
+            names: ["youtube"],
+            url: "https://www.youtube.com/",
+            english: "Opening YouTube.",
+            romanUrdu: "YouTube khol rahi hoon."
+        },
+        {
+            names: ["google"],
+            url: "https://www.google.com/",
+            english: "Opening Google.",
+            romanUrdu: "Google khol rahi hoon."
+        },
+        {
+            names: ["fiverr"],
+            url: "https://www.fiverr.com/",
+            english: "Opening Fiverr.",
+            romanUrdu: "Fiverr khol rahi hoon."
+        },
+        {
+            names: ["linkedin"],
+            url: "https://www.linkedin.com/",
+            english: "Opening LinkedIn.",
+            romanUrdu: "LinkedIn khol rahi hoon."
+        },
+        {
+            names: ["tradingview", "trading view"],
+            url: "https://www.tradingview.com/",
+            english: "Opening TradingView.",
+            romanUrdu: "TradingView khol rahi hoon."
+        },
+        {
+            names: ["gmail"],
+            url: "https://mail.google.com/",
+            english: "Opening Gmail.",
+            romanUrdu: "Gmail khol rahi hoon."
+        }
+    ];
+
+    const englishCommand = /\b(open|launch|visit|go to)\b/i.test(command);
+    const urduCommand = /\b(kholo|khol|khol do|kholna)\b/i.test(command);
+
+    for (const site of sites) {
+        const mentionsSite = site.names.some(name => command.includes(name));
+
+        if (!mentionsSite) continue;
+        if (!englishCommand && !urduCommand) continue;
+
+        return {
+            url: site.url,
+            reply: englishCommand ? site.english : site.romanUrdu
+        };
     }
-
-
-    // YOUTUBE
-    if (
-        command.includes("open youtube") ||
-        command.includes("youtube kholo") ||
-        command.includes("youtube khol do") ||
-        command === "youtube"
-    ) {
-        window.open("https://www.youtube.com/", "_blank");
-        return "YouTube khol rahi hoon ▶️";
-    }
-
-
-    // FIVERR
-    if (
-        command.includes("open fiverr") ||
-        command.includes("fiverr kholo") ||
-        command.includes("fiverr khol do")
-    ) {
-        window.open("https://www.fiverr.com/", "_blank");
-        return "Fiverr khol rahi hoon 💼";
-    }
-
-
-    // LINKEDIN
-    if (
-        command.includes("open linkedin") ||
-        command.includes("linkedin kholo") ||
-        command.includes("linkedin khol do")
-    ) {
-        window.open("https://www.linkedin.com/", "_blank");
-        return "LinkedIn khol rahi hoon 💼";
-    }
-
-
-    // TRADINGVIEW
-    if (
-        command.includes("open tradingview") ||
-        command.includes("open trading view") ||
-        command.includes("tradingview kholo") ||
-        command.includes("trading view kholo") ||
-        command.includes("tradingview khol do")
-    ) {
-        window.open("https://www.tradingview.com/", "_blank");
-        return "TradingView khol rahi hoon 📈";
-    }
-
-
-    // GMAIL
-    if (
-        command.includes("open gmail") ||
-        command.includes("gmail kholo") ||
-        command.includes("gmail khol do") ||
-        command.includes("email kholo")
-    ) {
-        window.open("https://mail.google.com/", "_blank");
-        return "Gmail khol rahi hoon 📧";
-    }
-
 
     return null;
 }
-
 
 // ========================================
 // SEND MESSAGE
 // ========================================
 
-function sendMessage() {
-
+async function sendMessage() {
     const input = document.getElementById("userInput");
     const chat = document.getElementById("chat");
 
     if (!input || !chat) return;
 
     const userText = input.value.trim();
-
-    if (!userText) return;
-
+    if (!userText || requestInProgress) return;
 
     addMessage(userText, "user");
 
@@ -120,701 +110,497 @@ function sendMessage() {
 
     input.value = "";
 
+    
+const command = checkCommand(userText);
 
-    // CHECK LOCAL COMMAND FIRST
-    const commandReply = checkCommand(userText);
+if (command) {
+    // Open the website immediately.
+    window.open(command.url, "_blank");
 
-    if (commandReply) {
+    // Show the reply without opening the website again.
+    showBotResponse(command.reply);
 
-        showBotResponse(commandReply);
+    conversationHistory.push({
+        role: "assistant",
+        content: command.reply
+    });
 
-        return;
-    }
+    return;
+}
+
+requestInProgress = true;
 
 
-    // THINKING MESSAGE
     const botMessage = document.createElement("div");
-
     botMessage.className = "message bot";
 
-    botMessage.innerHTML = `
-        <div class="avatar">🤖</div>
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = "🤖";
 
-        <div class="bubble thinking-bubble">
+    const bubble = document.createElement("div");
+    bubble.className = "bubble thinking-bubble";
+    bubble.textContent = "Thinking...";
 
-            <span class="thinking-text">
-                Thinking
-            </span>
-
-            <span class="thinking-dots">
-                <span>.</span>
-                <span>.</span>
-                <span>.</span>
-            </span>
-
-        </div>
-    `;
-
+    botMessage.append(avatar, bubble);
     chat.appendChild(botMessage);
-
     scrollToBottom();
 
-
-    // SEND TO APPS SCRIPT
-    fetch(API_URL, {
-
-        method: "POST",
-
-        headers: {
-            "Content-Type": "text/plain;charset=utf-8"
-        },
-
-        body: JSON.stringify({
-            message: userText,
-            history: conversationHistory
-        })
-
-    })
-
-    .then(function(response) {
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: JSON.stringify({
+                message: userText,
+                history: conversationHistory
+            })
+        });
 
         if (!response.ok) {
-            throw new Error(
-                "Server error: " + response.status
-            );
+            throw new Error("Server error: " + response.status);
         }
 
-        return response.json();
-
-    })
-
-    .then(function(data) {
-
+        const data = await response.json();
         console.log("AI Response:", data);
 
-        const reply =
-            data.reply ||
-            "I couldn't generate a response.";
-
+        const reply = data.reply || "I couldn't generate a response.";
 
         conversationHistory.push({
             role: "assistant",
             content: reply
         });
 
+        typeMessage(botMessage, reply);
+        speakText(reply);
 
-        const bubble =
-            botMessage.querySelector(".bubble");
+    } catch (error) {
+        console.error("AI connection error:", error);
 
-        bubble.innerHTML = "";
+        bubble.classList.remove("thinking-bubble");
+        bubble.textContent =
+            "Connection error. Please check your internet and Apps Script deployment.";
 
-
-        typeMessage(
-            botMessage,
-            reply
-        );
-
-
-        if (speechEnabled) {
-            speakText(reply);
-        }
-
-    })
-
-    .catch(function(error) {
-
-        console.error(
-            "Connection Error:",
-            error
-        );
-
-        const bubble =
-            botMessage.querySelector(".bubble");
-
-        bubble.innerHTML =
-            "Connection error 😭 Please check your Apps Script.";
-
-    });
-}
-
-
-// ========================================
-// BOT COMMAND RESPONSE
-// ========================================
-
-function showBotResponse(text) {
-
-    const chat = document.getElementById("chat");
-
-    if (!chat) return;
-
-    const botMessage =
-        document.createElement("div");
-
-    botMessage.className =
-        "message bot";
-
-    botMessage.innerHTML = `
-        <div class="avatar">🤖</div>
-        <div class="bubble"></div>
-    `;
-
-    chat.appendChild(botMessage);
-
-    scrollToBottom();
-
-    typeMessage(
-        botMessage,
-        text
-    );
-
-    conversationHistory.push({
-        role: "assistant",
-        content: text
-    });
-
-    if (speechEnabled) {
-        speakText(text);
+    } finally {
+        requestInProgress = false;
     }
 }
 
+// ========================================
+// DISPLAY BOT RESPONSE
+// ========================================
+
+function showBotResponse(text, url = null) {
+    const chat = document.getElementById("chat");
+    if (!chat) return;
+
+    const message = document.createElement("div");
+    message.className = "message bot";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = "🤖";
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+
+    if (url) {
+        const link = document.createElement("a");
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "Open website";
+        link.style.display = "inline-block";
+        link.style.marginTop = "8px";
+        link.style.color = "#ff5068";
+
+        bubble.appendChild(document.createElement("br"));
+        bubble.appendChild(link);
+
+        // Opening a new tab may be blocked by browser settings.
+        window.open(url, "_blank", "noopener,noreferrer");
+    }
+
+    message.append(avatar, bubble);
+    chat.appendChild(message);
+    scrollToBottom();
+
+    speakText(text);
+}
 
 // ========================================
-// TYPING ANIMATION
+// TYPE RESPONSE
+// Pause stops typing; Resume continues.
 // ========================================
 
 function typeMessage(element, text) {
-
-    const bubble =
-        element.querySelector(".bubble");
-
+    const bubble = element.querySelector(".bubble");
     if (!bubble) return;
 
-    bubble.innerHTML = "";
+    if (typingTimer) {
+        clearTimeout(typingTimer);
+        typingTimer = null;
+    }
+
+    bubble.classList.remove("thinking-bubble");
+    bubble.textContent = "";
 
     let index = 0;
 
-    const typingSpeed = 20;
+    function typeNext() {
+        if (!bubble.isConnected) {
+            typingTimer = null;
+            return;
+        }
 
-
-    function typeCharacter() {
+        if (isPaused) {
+            typingTimer = setTimeout(typeNext, 100);
+            return;
+        }
 
         if (index < text.length) {
-
-            bubble.textContent +=
-                text.charAt(index);
-
+            bubble.textContent += text.charAt(index);
             index++;
-
             scrollToBottom();
-
-            setTimeout(
-                typeCharacter,
-                typingSpeed
-            );
-
+            typingTimer = setTimeout(typeNext, 25);
+        } else {
+            typingTimer = null;
         }
     }
 
-    typeCharacter();
+    typeNext();
 }
-
 
 // ========================================
 // ADD MESSAGE
 // ========================================
 
 function addMessage(text, type) {
-
-    const chat =
-        document.getElementById("chat");
-
+    const chat = document.getElementById("chat");
     if (!chat) return;
 
-    const message =
-        document.createElement("div");
+    const message = document.createElement("div");
+    message.className = "message " + type;
 
-    message.className =
-        "message " + type;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
 
-    message.textContent = text;
-
+    message.appendChild(bubble);
     chat.appendChild(message);
 
     scrollToBottom();
 }
-
 
 // ========================================
 // SCROLL
 // ========================================
 
 function scrollToBottom() {
-
-    const chat =
-        document.getElementById("chat");
-
-    if (chat) {
-        chat.scrollTop =
-            chat.scrollHeight;
-    }
+    const chat = document.getElementById("chat");
+    if (chat) chat.scrollTop = chat.scrollHeight;
 }
-
 
 // ========================================
 // ENTER KEY
 // ========================================
 
 function handleKeyPress(event) {
-
-    if (
-        event.key === "Enter" &&
-        !event.shiftKey
-    ) {
-
+    if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-
         sendMessage();
     }
 }
-
 
 // ========================================
 // CLEAR CHAT
 // ========================================
 
 function clearChat() {
+    const chat = document.getElementById("chat");
 
-    const chat =
-        document.getElementById("chat");
-
-    if (!chat) return;
+    if (typingTimer) {
+        clearTimeout(typingTimer);
+        typingTimer = null;
+    }
 
     stopAllSpeech();
 
-    chat.innerHTML = "";
+    if (chat) chat.innerHTML = "";
 
     conversationHistory = [];
-
-    console.log("🗑️ Chat cleared.");
 }
-
 
 // ========================================
 // TEXT TO SPEECH
 // ========================================
 
 function speakText(text) {
-
-    if (!speechEnabled) return;
-
-    if (!("speechSynthesis" in window)) return;
+    if (!speechEnabled || !("speechSynthesis" in window)) return;
 
     window.speechSynthesis.cancel();
 
-    speechQueue =
-        String(text)
-            .match(
-                /[^.!?]+[.!?]+|[^.!?]+$/g
-            )
-            ?.map(function(sentence) {
-                return sentence.trim();
-            })
-            .filter(Boolean)
-            ||
-            [String(text)];
-
-    currentSpeechIndex = 0;
-
-    isPaused = false;
+    currentSpeechText = String(text);
+    speechCharIndex = 0;
+    currentUtterance = null;
     isSpeaking = false;
+    speechWasMuted = false;
 
-    updatePauseButton();
-
-    speakNextPart();
+    if (!isPaused) startCurrentSpeech();
 }
 
+function startCurrentSpeech() {
+    if (!speechEnabled || !currentSpeechText || isPaused) return;
 
-// ========================================
-// SPEAK NEXT PART
-// ========================================
+    const synth = window.speechSynthesis;
+    const fullText = currentSpeechText;
+    const startIndex = Math.min(speechCharIndex, fullText.length);
 
-function speakNextPart() {
-
-    if (!speechEnabled || isPaused) return;
-
-    if (
-        currentSpeechIndex >=
-        speechQueue.length
-    ) {
-
-        isSpeaking = false;
-
-        updatePauseButton();
-
+    if (startIndex >= fullText.length) {
+        finishSpeech();
         return;
     }
 
+    const utterance = new SpeechSynthesisUtterance(
+        fullText.substring(startIndex)
+    );
 
-    const text =
-        speechQueue[currentSpeechIndex];
+    currentUtterance = utterance;
 
-
-    const utterance =
-        new SpeechSynthesisUtterance(text);
-
+    utterance.lang = /[\u0600-\u06FF]/.test(fullText)
+        ? "ur-PK"
+        : "en-US";
 
     utterance.rate = 0.95;
     utterance.pitch = 1;
     utterance.volume = 1;
 
+    utterance.onboundary = function(event) {
+        if (currentUtterance !== utterance) return;
+
+        if (typeof event.charIndex === "number") {
+            speechCharIndex = startIndex + event.charIndex;
+        }
+    };
 
     utterance.onstart = function() {
+        if (currentUtterance !== utterance) return;
 
         isSpeaking = true;
-
         updatePauseButton();
-
     };
-
 
     utterance.onend = function() {
+        if (currentUtterance !== utterance) return;
 
-        if (isPaused) return;
-
-        currentSpeechIndex++;
-
-        setTimeout(
-            speakNextPart,
-            80
-        );
-
+        speechCharIndex = fullText.length;
+        finishSpeech();
     };
-
 
     utterance.onerror = function(event) {
+        if (currentUtterance !== utterance) return;
 
-        console.error(
-            "Speech error:",
-            event.error
-        );
+        if (event.error !== "canceled" &&
+            event.error !== "interrupted") {
+            console.warn("Speech error:", event.error);
+        }
 
+        currentUtterance = null;
         isSpeaking = false;
-
         updatePauseButton();
-
     };
 
-
-    window.speechSynthesis.speak(
-        utterance
-    );
+    synth.speak(utterance);
 }
 
+function finishSpeech() {
+    currentUtterance = null;
+    currentSpeechText = "";
+    speechCharIndex = 0;
+    speechWasMuted = false;
+    isSpeaking = false;
+    updatePauseButton();
+}
 
 // ========================================
-// PAUSE / RESUME
+// PAUSE / RESUME TEXT AND SPEECH
 // ========================================
 
 function togglePause() {
+    const synth = window.speechSynthesis;
 
-    if (!("speechSynthesis" in window)) return;
-
-    const synth =
-        window.speechSynthesis;
-
-
-    if (
-        synth.speaking &&
-        !synth.paused
-    ) {
-
-        synth.pause();
-
+    if (!isPaused) {
         isPaused = true;
 
-        updatePauseButton();
+        if (synth && synth.speaking && !synth.paused) {
+            synth.pause();
+        }
 
+        updatePauseButton();
         return;
     }
 
+    isPaused = false;
 
-    if (synth.paused) {
-
-        isPaused = false;
-
-        synth.resume();
-
-        updatePauseButton();
-
+    if (currentSpeechText && speechEnabled) {
+        if (synth && synth.paused && currentUtterance) {
+            synth.resume();
+        } else if (!currentUtterance) {
+            startCurrentSpeech();
+        }
     }
+
+    updatePauseButton();
 }
-
-
-// ========================================
-// PAUSE BUTTON
-// ========================================
 
 function updatePauseButton() {
-
-    const button =
-        document.getElementById(
-            "pauseVoiceButton"
-        );
-
+    const button = document.getElementById("pauseVoiceButton");
     if (!button) return;
 
-
-    if (isPaused) {
-
-        button.textContent = "▶️";
-        button.title = "Resume";
-
-    } else {
-
-        button.textContent = "⏸️";
-        button.title = "Pause";
-    }
+    button.textContent = isPaused ? "▶️" : "⏸️";
+    button.title = isPaused ? "Resume" : "Pause";
+    button.setAttribute("aria-label", button.title);
 }
 
-
 // ========================================
-// VOICE ON / OFF
+// SOUND ON / OFF
 // ========================================
 
 function toggleVoice() {
+    speechEnabled = !speechEnabled;
 
-    speechEnabled =
-        !speechEnabled;
+    const button = document.getElementById("voiceToggleButton");
 
-    const button =
-        document.getElementById(
-            "voiceToggleButton"
-        );
-
-
-    if (speechEnabled) {
-
-        if (button) {
-
-            button.textContent = "🔊";
-            button.title = "Voice ON";
-
-        }
-
-    } else {
-
-        if (button) {
-
-            button.textContent = "🔇";
-            button.title = "Voice OFF";
-
-        }
-
-        stopAllSpeech();
+    if (button) {
+        button.textContent = speechEnabled ? "🔊" : "🔇";
+        button.title = speechEnabled ? "Sound ON" : "Sound OFF";
+        button.setAttribute("aria-label", button.title);
     }
+
+    if (!speechEnabled) {
+        speechWasMuted = Boolean(currentSpeechText) &&
+            Boolean(currentUtterance) &&
+            (isSpeaking || window.speechSynthesis.speaking);
+
+        if (speechWasMuted) {
+            // Save the last known character position before cancelling.
+            window.speechSynthesis.cancel();
+            currentUtterance = null;
+            isSpeaking = false;
+        }
+    } else if (speechWasMuted && currentSpeechText && !isPaused) {
+        speechWasMuted = false;
+        startCurrentSpeech();
+    } else {
+        speechWasMuted = false;
+    }
+
+    updatePauseButton();
 }
 
-
-// ========================================
-// STOP SPEECH
-// ========================================
-
 function stopAllSpeech() {
-
     if ("speechSynthesis" in window) {
         window.speechSynthesis.cancel();
     }
 
-    speechQueue = [];
-
-    currentSpeechIndex = 0;
-
+    currentUtterance = null;
+    currentSpeechText = "";
+    speechCharIndex = 0;
+    speechWasMuted = false;
     isPaused = false;
     isSpeaking = false;
 
     updatePauseButton();
 }
-
 
 // ========================================
 // VOICE INPUT
 // ========================================
 
 function startVoiceInput() {
-
     const SpeechRecognition =
         window.SpeechRecognition ||
         window.webkitSpeechRecognition;
 
-
     if (!SpeechRecognition) {
-
-        alert(
-            "Voice input is not supported in this browser."
-        );
-
+        alert("Voice input is not supported. Please try Chrome.");
         return;
     }
 
+    if (voiceListening) {
+        if (recognition) recognition.stop();
+        return;
+    }
 
-    if (voiceListening) return;
-
-
-    recognition =
-        new SpeechRecognition();
-
-
-    // Keep this English because Chrome
-    // works more reliably with it.
-    // Roman Urdu commands are handled
-    // after recognition.
-
+    recognition = new SpeechRecognition();
     recognition.lang = "en-US";
-
     recognition.interimResults = false;
-
     recognition.continuous = false;
 
-
     recognition.onstart = function() {
-
         voiceListening = true;
-
-        const button =
-            document.querySelector(
-                '.icon-button[title="Voice input"]'
-            );
-
-
-        if (button) {
-
-            button.textContent = "🔴";
-
-            button.title = "Listening...";
-
-        }
-
-        console.log("🎤 Listening...");
+        setVoiceButton(true);
     };
-
 
     recognition.onresult = function(event) {
-
-        const text =
-            event.results[0][0]
-                .transcript;
-
-
-        console.log(
-            "🎤 You said:",
-            text
-        );
-
-
-        const input =
-            document.getElementById(
-                "userInput"
-            );
-
+        const transcript = event.results[0][0].transcript;
+        const input = document.getElementById("userInput");
 
         if (input) {
-
-            input.value = text;
-
-        }
-
-
-        if (text.trim()) {
-
+            input.value = transcript;
             sendMessage();
-
         }
     };
-
 
     recognition.onerror = function(event) {
-
-        console.error(
-            "Voice input error:",
-            event.error
-        );
-
+        console.warn("Voice input error:", event.error);
         voiceListening = false;
-
-        resetVoiceButton();
+        setVoiceButton(false);
     };
-
 
     recognition.onend = function() {
-
         voiceListening = false;
-
-        resetVoiceButton();
-
-        console.log(
-            "🎤 Voice input ended."
-        );
+        setVoiceButton(false);
     };
 
-
-    recognition.start();
-}
-
-
-// ========================================
-// RESET VOICE BUTTON
-// ========================================
-
-function resetVoiceButton() {
-
-    const button =
-        document.querySelector(
-            '.icon-button[title="Listening..."]'
-        );
-
-
-    if (button) {
-
-        button.textContent = "🎤";
-
-        button.title = "Voice input";
-
+    try {
+        recognition.start();
+    } catch (error) {
+        console.error("Could not start microphone:", error);
     }
 }
 
+function setVoiceButton(listening) {
+    const button = document.querySelector(
+        'button[onclick="startVoiceInput()"]'
+    );
+
+    if (!button) return;
+
+    button.textContent = listening ? "🔴" : "🎤";
+    button.title = listening ? "Listening..." : "Voice input";
+}
 
 // ========================================
-// PAGE LOAD
+// INITIALIZE
 // ========================================
 
-document.addEventListener(
-    "DOMContentLoaded",
-    function() {
+document.addEventListener("DOMContentLoaded", function() {
+    const input = document.getElementById("userInput");
 
-        const input =
-            document.getElementById(
-                "userInput"
-            );
-
-
-        if (input) {
-
-            input.addEventListener(
-                "keydown",
-                handleKeyPress
-            );
-
-        }
-
-
-        updatePauseButton();
-
-
-        console.log(
-            "🦇 Anusha AI ready."
-        );
-
+    if (input) {
+        input.onkeydown = handleKeyPress;
     }
-);
-   
+
+    updatePauseButton();
+
+    const soundButton = document.getElementById("voiceToggleButton");
+
+    if (soundButton) {
+        soundButton.textContent = speechEnabled ? "🔊" : "🔇";
+    }
+
+    console.log("Anusha AI loaded successfully.");
+});

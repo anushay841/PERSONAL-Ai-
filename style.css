@@ -777,3 +777,121 @@ body {
         display: none;
     }
 }
+
+/* =====================================
+   MOBILE FRIENDLY - ANUSHA AI
+===================================== */
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    width: 100%;
+    min-height: 100%;
+}
+
+body {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    overflow-x: hidden;
+}
+
+img,
+video {
+    max-width: 100%;
+    height: auto;
+}
+
+#chat {
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    -webkit-overflow-scrolling: touch;
+}
+
+.message,
+.bubble {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.input-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+
+#userInput {
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* Tablets and mobile phones */
+@media screen and (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    .input-area {
+        gap: 7px;
+        align-items: center;
+    }
+
+    #userInput {
+        order: -1;
+        flex: 1 1 100%;
+        width: 100%;
+        min-height: 44px;
+        font-size: 16px;
+        padding: 10px;
+    }
+
+    .input-area button {
+        flex: 1 1 auto;
+        min-width: 42px;
+        min-height: 44px;
+        padding: 10px;
+        font-size: 16px;
+        touch-action: manipulation;
+        cursor: pointer;
+    }
+
+    #chat {
+        max-width: 100%;
+        padding: 10px;
+    }
+
+    .message {
+        max-width: 100%;
+    }
+
+    .bubble {
+        max-width: 100%;
+        font-size: 15px;
+        line-height: 1.5;
+    }
+}
+
+/* Small mobile screens */
+@media screen and (max-width: 400px) {
+    body {
+        padding: 6px;
+    }
+
+    .input-area {
+        gap: 5px;
+    }
+
+    .input-area button {
+        min-width: 38px;
+        min-height: 42px;
+        padding: 8px;
+    }
+
+    #chat {
+        padding: 8px;
+    }
+}
